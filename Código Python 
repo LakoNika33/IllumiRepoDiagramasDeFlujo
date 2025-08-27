@@ -1,16 +1,125 @@
-# Imprimir un mensaje en pantalla
-print("Hola Mundo")
+from PIL import Image, ImageDraw, ImageFont
 
-# Pedir el nombre al usuario y saludar
-nombre = input("¿Cómo te llamas? ")
-print("¡Hola, " + nombre + "!")
+# --- Funciones auxiliares ---
+def crear_gradiente(draw, x0, y0, x1, y1, color_inicio, color_fin):
+    r1, g1, b1 = color_inicio
+    r2, g2, b2 = color_fin
+    height = y1 - y0
+    for i in range(height):
+        r = int(r1 + (r2 - r1) * i / height)
+        g = int(g1 + (g2 - g1) * i / height)
+        b = int(b1 + (b2 - b1) * i / height)
+        draw.line([x0, y0+i, x1, y0+i], fill=(r, g, b))
 
-# Pedir la edad al usuario
-edad = input("¿Cuántos años tienes? ")
-print("Entonces tienes " + edad + " años.")
+def dibujar_rectangulo(draw, x, y, w, h, texto, color_inicio, color_fin):
+    crear_gradiente(draw, x-w//2, y-h//2, x+w//2, y+h//2, color_inicio, color_fin)
+    draw.rounded_rectangle([x-w//2, y-h//2, x+w//2, y+h//2], radius=15, outline="black", width=2)
+    try:
+        font = ImageFont.truetype("arial.ttf", 16)
+    except:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0,0), texto, font=font)
+    w_text = bbox[2] - bbox[0]
+    h_text = bbox[3] - bbox[1]
+    draw.text((x - w_text/2, y - h_text/2), texto, fill="black", font=font)
 
-# Calcular un número de la suerte a partir de la edad
-edad = int(input("¿Cuántos años tienes? "))
+def dibujar_rombo(draw, x, y, w, h, texto, color_inicio, color_fin):
+    puntos = [(x, y-h//2), (x+w//2, y), (x, y+h//2), (x-w//2, y)]
+    crear_gradiente(draw, x-w//2, y-h//2, x+w//2, y+h//2, color_inicio, color_fin)
+    draw.polygon(puntos, outline="black", fill=None)
+    try:
+        font = ImageFont.truetype("arial.ttf", 16)
+    except:
+        font = ImageFont.load_default()
+    bbox = draw.textbbox((0,0), texto, font=font)
+    w_text = bbox[2] - bbox[0]
+    h_text = bbox[3] - bbox[1]
+    draw.text((x - w_text/2, y - h_text/2), texto, fill="black", font=font)
 
-numero_suerte = (edad * 7) + 3
-print("Tu número de la suerte es:", numero_suerte)
+def dibujar_flecha_curva(draw, x0, y0, x1, y1):
+    mid_x = (x0 + x1) // 2
+    draw.line([x0, y0, mid_x, y0, mid_x, y1, x1, y1], fill="black", width=3)
+    head_size = 10
+    draw.polygon([(x1, y1), (x1 - head_size, y1 - head_size), (x1 + head_size, y1 - head_size)], fill="black")
+
+def crear_diagrama_flujo(nombre, nodos, conexiones, archivo_salida, colores):
+    ancho, alto = 800, 150 + len(nodos)*150
+    img = Image.new("RGB", (ancho, alto), color="white")
+    draw = ImageDraw.Draw(img)
+    
+    posiciones = {}
+    y_inicio = 80
+    for i, (nodo, tipo) in enumerate(nodos):
+        x = ancho // 2
+        y = y_inicio + i*150
+        posiciones[nodo] = (x, y)
+        color_i, color_f = colores[i % len(colores)]
+        if tipo == "proceso":
+            dibujar_rectangulo(draw, x, y, 300, 70, nodo, color_i, color_f)
+        elif tipo == "decision":
+            dibujar_rombo(draw, x, y, 200, 100, nodo, color_i, color_f)
+    
+    for origen, destino in conexiones:
+        x0, y0 = posiciones[origen]
+        x1, y1 = posiciones[destino]
+        dibujar_flecha_curva(draw, x0, y0 + 35, x1, y1 - 35)
+    
+    img.save(archivo_salida)
+    print(f"Diagrama '{nombre}' guardado como {archivo_salida}")
+
+# --- Colores distintos para cada diagrama ---
+colores_hola = [((255,200,200),(255,100,100))]
+colores_saludo = [((200,255,200),(100,255,100))]
+colores_edad = [((200,200,255),(100,100,255))]
+colores_suerte = [((255,255,200),(255,255,100))]
+
+# --- 1. Hola Mundo ---
+nodos_hola = [("Inicio", "proceso"), ("Mostrar 'Hola Mundo'", "proceso"), ("Fin", "proceso")]
+conexiones_hola = [("Inicio", "Mostrar 'Hola Mundo'"), ("Mostrar 'Hola Mundo'", "Fin")]
+crear_diagrama_flujo("Hola Mundo", nodos_hola, conexiones_hola, "/sdcard/Download/hola_mundo_flujo_color.png", colores_hola)
+
+# --- 2. Saludo ---
+nodos_saludo = [
+    ("Inicio", "proceso"),
+    ("Pedir nombre al usuario", "proceso"),
+    ("Mostrar 'Hola, <nombre>'", "proceso"),
+    ("Fin", "proceso")
+]
+conexiones_saludo = [
+    ("Inicio", "Pedir nombre al usuario"),
+    ("Pedir nombre al usuario", "Mostrar 'Hola, <nombre>'"),
+    ("Mostrar 'Hola, <nombre>'", "Fin")
+]
+crear_diagrama_flujo("Saludo Usuario", nodos_saludo, conexiones_saludo, "/sdcard/Download/saludo_flujo_color.png", colores_saludo)
+
+# --- 3. Preguntar Edad ---
+nodos_edad = [
+    ("Inicio", "proceso"),
+    ("Pedir edad al usuario", "proceso"),
+    ("Mostrar 'Tienes <edad> años'", "proceso"),
+    ("Fin", "proceso")
+]
+conexiones_edad = [
+    ("Inicio", "Pedir edad al usuario"),
+    ("Pedir edad al usuario", "Mostrar 'Tienes <edad> años'"),
+    ("Mostrar 'Tienes <edad> años'", "Fin")
+]
+crear_diagrama_flujo("Preguntar Edad", nodos_edad, conexiones_edad, "/sdcard/Download/preguntar_edad_flujo_color.png", colores_edad)
+
+# --- 4. Número de la Suerte ---
+nodos_suerte = [
+    ("Inicio", "proceso"),
+    ("Pedir edad al usuario", "proceso"),
+    ("Edad >= 18?", "decision"),
+    ("Calcular numero_suerte = edad*7 +3", "proceso"),
+    ("Mostrar 'Tu numero de la suerte es: <numero_suerte>'", "proceso"),
+    ("Fin", "proceso")
+]
+conexiones_suerte = [
+    ("Inicio", "Pedir edad al usuario"),
+    ("Pedir edad al usuario", "Edad >= 18?"),
+    ("Edad >= 18?", "Calcular numero_suerte = edad*7 +3"),
+    ("Calcular numero_suerte = edad*7 +3", "Mostrar 'Tu numero de la suerte es: <numero_suerte>'"),
+    ("Mostrar 'Tu numero de la suerte es: <numero_suerte>'", "Fin")
+]
+crear_diagrama_flujo("Número de la Suerte", nodos_suerte, conexiones_suerte, "/sdcard/Download/numero_suerte_flujo_color.png", colores_suerte)
